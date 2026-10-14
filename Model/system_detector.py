@@ -1,5 +1,7 @@
 import warnings
 # Silence all scikit-learn and joblib multithreading warnings globally
+warnings.warn = lambda *args, **kwargs: None
+warnings.filterwarnings("ignore")
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", module="sklearn")
 warnings.filterwarnings("ignore", module="joblib")

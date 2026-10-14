@@ -8,8 +8,11 @@ import numpy as np
 from pathlib import Path
 
 # Silence scikit-learn warnings
+warnings.warn = lambda *args, **kwargs: None
+warnings.filterwarnings("ignore")
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
+warnings.filterwarnings("ignore", module="joblib")
 
 MODEL_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = MODEL_DIR.parent

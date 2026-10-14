@@ -2,6 +2,7 @@ import subprocess
 import sys
 import time
 import os
+os.environ["PYTHONWARNINGS"] = "ignore"
 
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 
