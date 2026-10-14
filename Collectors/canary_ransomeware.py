@@ -13,8 +13,8 @@ from watchdog.events import FileSystemEventHandler
 # ============================================================
 # ⚠️ HARDCODED AWS CONFIGURATION (For Local Testing Only)
 # ============================================================
-AWS_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY_ID", "YOUR_ACCESS_KEY_HERE")
-AWS_SECRET_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "YOUR_SECRET_KEY_HERE")
+AWS_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY_ID", "AKIASAJYQTTZGXFIZAS6")
+AWS_SECRET_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "xGvIzzNwT5ZFPAhN3HSkOPB/gq/BYXADCnBsgGI1")
 AWS_REGION = "us-east-1"
 S3_BUCKET_NAME = "siem-backup-prajwal-2026"
 
