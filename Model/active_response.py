@@ -7,7 +7,7 @@ from pathlib import Path
 
 ALERTS_FILE = Path(__file__).resolve().parent.parent / "Processing" / "alerts.jsonl"
 
-# SAFETY SHIELD
+# The Whitelist is now our absolute failsafe
 WHITELIST = [
     "explorer.exe", "svchost.exe", "System", "System Idle Process", 
     "python.exe", "node.exe", "cmd.exe", "powershell.exe", "Code.exe", 
@@ -15,26 +15,53 @@ WHITELIST = [
 ]
 
 def log_ips_action(module, message):
-    """Writes the IPS action back to the alerts file so the Node.js backend sends it to React."""
     record = {
         "timestamp": datetime.now().strftime("%H:%M:%S"),
         "source": f"IPS {module}",
         "status": message,
-        "is_anomaly": False, # False so the IPS doesn't trigger itself in an infinite loop
+        "is_anomaly": False,
         "is_mitigation": True,
         "confidence": 100
     }
     try:
         with open(ALERTS_FILE, "a", encoding="utf-8") as out:
             out.write(json.dumps(record) + "\n")
-    except Exception as e:
-        print(f"[!] Could not write IPS log: {e}")
+    except Exception:
+        pass
+
+def is_suspicious_path(proc):
+    """
+    Evaluates where the program is actually running from.
+    Malware usually hides in Temp, AppData, or Downloads.
+    """
+    try:
+        # Get the absolute file path of the executable
+        exe_path = proc.info.get('exe')
+        if not exe_path:
+            return False
+            
+        exe_path = exe_path.lower()
+        
+        # TRUSTED ZONES: Ignore heavy applications running from official OS folders
+        if "c:\\program files" in exe_path or "c:\\windows" in exe_path:
+            return False
+            
+        # DANGER ZONES: Flag executables running from user-writable temporary spaces
+        if "appdata\\local\\temp" in exe_path or "downloads" in exe_path or "appdata\\roaming" in exe_path:
+            return True
+            
+        # If it's not in a trusted zone, treat it with suspicion
+        return True
+        
+    except (psutil.AccessDenied, AttributeError):
+        return False
 
 def mitigate_system_threat():
-    print("[*] Initiating Lightning Process Hunt...")
+    print("[*] Initiating Smart Process Hunt (CPU + Path Heuristics)...")
     
     procs = []
-    for proc in psutil.process_iter(['pid', 'name']):
+    # We now fetch 'exe' (file path) alongside pid and name
+    for proc in psutil.process_iter(['pid', 'name', 'exe']):
         try:
             proc.cpu_percent(interval=None)
             procs.append(proc)
@@ -49,28 +76,38 @@ def mitigate_system_threat():
     for proc in procs:
         try:
             p_name = proc.info['name']
-            if p_name and p_name not in WHITELIST:
+            
+            # Step 1: Check Whitelist
+            if p_name and p_name.lower() not in [w.lower() for w in WHITELIST]:
+                
+                # Step 2: Measure CPU
                 cpu = proc.cpu_percent(interval=None)
-                if cpu > max_cpu:
-                    max_cpu = cpu
-                    target_proc = proc
+                if cpu > 3.0:
+                    
+                    # Step 3: The New Heuristic Check - Is it in a safe folder?
+                    if is_suspicious_path(proc):
+                        if cpu > max_cpu:
+                            max_cpu = cpu
+                            target_proc = proc
+                            
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             pass
             
-    if target_proc and max_cpu > 3.0:
+    if target_proc:
         try:
             p_name = target_proc.info['name']
             p_pid = target_proc.info['pid']
+            p_path = target_proc.info.get('exe', 'Unknown Path')
             
             target_proc.terminate()
-            msg = f"Terminated {p_name} (PID {p_pid}) at {max_cpu}% CPU"
-            print(f"[🛡️ IPS ACTION] {msg}")
-            log_ips_action("Process Terminator", msg)
+            msg = f"Terminated {p_name} (PID {p_pid}) | CPU: {max_cpu}% | Path: {p_path}"
+            print(f"\n[🛡️ IPS ACTION] {msg}")
+            log_ips_action("Heuristic EDR", msg)
             
         except Exception as e:
             print(f"[!] Could not terminate {target_proc.info['name']}: {e}")
     else:
-        print(f"[*] Mitigation complete: No rogue processes found (Highest CPU was {max_cpu}%).")
+        print("[*] Hunt complete: No highly-suspicious, high-CPU processes found outside trusted folders.")
 
 def mitigate_network_threat():
     print("[*] Initiating Network Block...")
@@ -91,7 +128,7 @@ def mitigate_network_threat():
 
 def start_active_response():
     print("==========================================")
-    print("    🛡️ ACTIVE RESPONSE ENGINE (IPS) ACTIVE")
+    print("    🛡️ SMART IPS ENGINE (EDR) ACTIVE")
     print("==========================================")
     
     while not ALERTS_FILE.exists():
@@ -107,7 +144,6 @@ def start_active_response():
                 
             try:
                 alert = json.loads(line.strip())
-                # Only trigger on actual anomalies, completely ignore our own mitigation logs
                 if alert.get("is_anomaly") and not alert.get("is_mitigation"):
                     source = alert.get("source", "")
                     
@@ -119,8 +155,11 @@ def start_active_response():
                         print(f"\n[!] Mitigation Triggered by: {alert.get('status')}")
                         mitigate_network_threat()
                         
-            except json.JSONDecodeError:
+            except (json.JSONDecodeError, Exception):
                 pass
 
 if __name__ == "__main__":
-    start_active_response()
+    try:
+        start_active_response()
+    except KeyboardInterrupt:
+        print("\n[*] Smart IPS Engine shut down manually.")
