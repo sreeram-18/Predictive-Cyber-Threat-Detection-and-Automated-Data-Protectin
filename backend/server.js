@@ -1,14 +1,16 @@
 const express = require('express');
 const http = require('http');
 const AWS = require('aws-sdk');
+require('dotenv').config();
 const { Server } = require('socket.io');
 const { Tail } = require('tail');
 const cors = require('cors');
 const fs = require('fs');
-
 const app = express();
 app.use(cors());
 const server = http.createServer(app);
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
 const io = new Server(server, {
   cors: { origin: "http://localhost:3000" }
@@ -16,8 +18,8 @@ const io = new Server(server, {
 
 // 1. CONFIGURE AWS FIRST
 AWS.config.update({
-  accessKeyId: "AKIASAJYQTTZGXFIZAS6", 
-  secretAccessKey: "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", 
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID, 
+  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY, 
   region: 'us-east-1', // Ensure this matches your bucket's region (e.g., ap-south-1 for Mumbai, us-east-1 for N. Virginia)
   signatureVersion: 'v4'
 });

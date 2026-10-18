@@ -9,12 +9,15 @@ import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+from dotenv import load_dotenv, find_dotenv
+
+load_dotenv()
 
 # ============================================================
 # ⚠️ HARDCODED AWS CONFIGURATION (For Local Testing Only)
 # ============================================================
-AWS_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY_ID", "AKIASAJYQTTZGXFIZAS6")
-AWS_SECRET_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "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")
+AWS_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY_ID", "AWS_ACCESS_KEY_ID")
+AWS_SECRET_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "AWS_SECRET_ACCESS_KEY")
 AWS_REGION = "us-east-1"
 S3_BUCKET_NAME = "siem-backup-prajwal-2026"
 

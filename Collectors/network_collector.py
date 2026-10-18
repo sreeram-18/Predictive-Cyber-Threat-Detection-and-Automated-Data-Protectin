@@ -5,6 +5,7 @@ import hashlib
 import threading
 from datetime import datetime
 from scapy.all import sniff, IP, TCP, UDP, ICMP
+from datetime import datetime, timezone
 
 
 # ============================================================
@@ -236,11 +237,11 @@ def process_packet(packet):
     if IP not in packet:
         return
 
-    # Use wire timestamp if present, fallback to system clock
+    # Use wire timestamp if present, fallback to system clock in UTC
     try:
-        timestamp = datetime.fromtimestamp(float(packet.time))
+        timestamp = datetime.fromtimestamp(float(packet.time), tz=timezone.utc)
     except Exception:
-        timestamp = datetime.now()
+        timestamp = datetime.now(timezone.utc)
 
     key = get_flow_key(packet)
     if key is None:
@@ -254,13 +255,56 @@ def process_packet(packet):
 
 def cleanup_flows():
     while True:
+        current_time = datetime.now(timezone.utc)
+        expired_keys = []
+
+        with flow_lock:
+            for key, flow in list(flows.items()):
+                last_seen = datetime.fromisoformat(flow["last_seen"])
+                
+                # Safely remove timezone info before subtracting
+                current_naive = current_time.replace(tzinfo=None)
+                last_naive = last_seen.replace(tzinfo=None)
+
+                if (current_naive - last_naive).total_seconds() >= FLOW_TIMEOUT:
+                    expired_keys.append(key)
+
+            expired_flows = [flows.pop(k) for k in expired_keys]
+
+        for flow in expired_flows:
+            save_flow(flow)
+
+        time.sleep(1)
+    while True:
+        current_time = datetime.now(timezone.utc)
+        expired_keys = []
+
+        with flow_lock:
+            for key, flow in list(flows.items()):
+                # Because last_seen now has +00:00, Python will parse it as aware
+                last_seen = datetime.fromisoformat(flow["last_seen"])
+                if (current_time - last_seen).total_seconds() >= FLOW_TIMEOUT:
+                    expired_keys.append(key)
+
+            expired_flows = [flows.pop(k) for k in expired_keys]
+
+        for flow in expired_flows:
+            save_flow(flow)
+
+        time.sleep(1)
+    while True:
         current_time = datetime.now()
         expired_keys = []
 
         with flow_lock:
             for key, flow in list(flows.items()):
                 last_seen = datetime.fromisoformat(flow["last_seen"])
-                if (current_time - last_seen).total_seconds() >= FLOW_TIMEOUT:
+                # Safely strip timezone info from both variables before subtracting
+                # Safely remove timezone info before subtracting
+                current_naive = current_time.replace(tzinfo=None)
+                last_naive = last_seen.replace(tzinfo=None)
+
+                if (current_naive - last_naive).total_seconds() >= FLOW_TIMEOUT:
                     expired_keys.append(key)
 
             expired_flows = [flows.pop(k) for k in expired_keys]
